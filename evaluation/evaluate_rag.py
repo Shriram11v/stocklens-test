@@ -1,18 +1,10 @@
 """
-FinTrace evaluation harness
-============================
 Runs a gold Q&A set (from an .xlsx built by build_gold_qa.py) against
 BM25 / Dense / Hybrid retrievers from src/, computes retrieval metrics
 (Hit@k, MRR, nDCG@k), and writes per-question results to JSON for later
-manual generation scoring (see build_scoring_template.py).
+manual generation scoring (build_scoring_template.py).
 
 SETUP
------
-This file can live anywhere in the repo (e.g. an evaluation/ folder) — it
-searches upward from its own location to find the folder that contains
-both src/ and processed_data/, so it doesn't need to sit at repo root.
-If your layout is unusual, pass --project-root explicitly. Then:
-
     python evaluate_rag.py Gold_QA_Set_CBA_DEV.xlsx --k 5
     python evaluate_rag.py Gold_QA_Set_CBA_DEV.xlsx --k 5 --retrievers bm25 dense
     python evaluate_rag.py Gold_QA_Set_CBA_DEV.xlsx --k 5 --generate   # also runs generator.py (needs Ollama)
@@ -26,14 +18,12 @@ single time, which is both slow and pointless since the corpus doesn't
 change between questions.
 
 WHAT COUNTS AS A "HIT"
------------------------
 A retrieved chunk counts as correct if its "page" field (the pipeline's own
 per-chunk page number — see the gold set's Corpus Notes tab) is IN the gold
 "Page(s)" list for that question. Multi-page gold answers (e.g. "16, 17")
 count a hit if the retrieved chunk matches ANY of those pages.
 
 COMPANY FILTER
---------------
 All CBA gold questions are evaluated with company="CBA" so NAB chunks in
 the shared index can't accidentally count as noise or false hits.
 """
