@@ -36,17 +36,6 @@ from pathlib import Path
 
 import openpyxl
 
-
-# ------------------------------------------------------------------
-# 0. Locate the repo root (the folder containing src/ and processed_data/)
-#    and make src/ importable, matching how hybrid_retriever.py imports
-#    bm25_retriever / dense_retriever directly (not as a package).
-#
-#    This file doesn't need to sit at repo root — it walks upward from
-#    its own location (e.g. an evaluation/ subfolder) looking for a
-#    directory that contains both src/ and processed_data/.
-# ------------------------------------------------------------------
-
 def find_project_root(start, max_up=5):
     current = Path(start).resolve()
     for _ in range(max_up + 1):
@@ -56,8 +45,7 @@ def find_project_root(start, max_up=5):
             break
         current = current.parent
     return None
-
-
+    
 def setup_src_path(explicit_root=None):
     if explicit_root:
         root = Path(explicit_root).resolve()
@@ -88,16 +76,11 @@ def setup_src_path(explicit_root=None):
             print(f"    (this folder doesn't exist)", file=sys.stderr)
     return root
 
-
-# ------------------------------------------------------------------
-# 1. LOAD THE GOLD SET
-# ------------------------------------------------------------------
+#LOAD THE GOLD SET
 
 def load_gold_set(xlsx_path):
-    """Reads the Dev or Test sheet from a gold-set workbook into a list of dicts."""
     wb = openpyxl.load_workbook(xlsx_path, data_only=True)
-    ws = wb.worksheets[0]  # first sheet is the Q&A sheet; others are notes/glossary
-
+    ws = wb.worksheets[0] 
     header_row_idx = None
     for i, row in enumerate(ws.iter_rows(min_row=1, max_row=10, values_only=True), start=1):
         if row and row[0] == "ID":
@@ -117,22 +100,13 @@ def load_gold_set(xlsx_path):
         records.append(rec)
     return records
 
-
-# ------------------------------------------------------------------
-# 2. BUILD RETRIEVERS (once each, reused across all questions)
-# ------------------------------------------------------------------
+# RETRIEVERS
 
 def build_retrievers(which):
-    """
-    Returns {name: callable(question, k) -> list of result dicts} for the
-    requested retriever names, built once each against the real chunk data.
-    """
     from bm25_retriever import BM25Retriever, load_chunks as load_chunks_bm25, CHUNKS_FILE
-
     print(f"Loading chunks from {CHUNKS_FILE} ...")
     chunks = load_chunks_bm25(CHUNKS_FILE)
     print(f"Loaded {len(chunks)} usable chunks.\n")
-
     retrievers = {}
 
     if "bm25" in which:
@@ -155,13 +129,7 @@ def build_retrievers(which):
     print()
     return retrievers
 
-
 def load_generator():
-    """
-    Lazily imports generate_answer from generator.py. Returns None (with a
-    warning) if Ollama isn't installed/running — generation is optional;
-    retrieval evaluation still works without it.
-    """
     try:
         from generator import generate_answer
         return generate_answer
@@ -170,9 +138,7 @@ def load_generator():
         return None
 
 
-# ------------------------------------------------------------------
-# 3. RETRIEVAL METRICS — Hit@k, MRR, nDCG@k (mirrors the Walert reproduction)
-# ------------------------------------------------------------------
+# RETRIEVAL METRICS — Hit@k, MRR, nDCG@k 
 
 def rank_of_first_hit(retrieved_pages, gold_pages):
     for i, page in enumerate(retrieved_pages, start=1):
@@ -180,18 +146,14 @@ def rank_of_first_hit(retrieved_pages, gold_pages):
             return i
     return None
 
-
 def hit_at_k(retrieved_pages, gold_pages, k):
     return int(any(p in gold_pages for p in retrieved_pages[:k]))
-
 
 def reciprocal_rank(retrieved_pages, gold_pages):
     rank = rank_of_first_hit(retrieved_pages, gold_pages)
     return 1.0 / rank if rank else 0.0
 
-
 def ndcg_at_k(retrieved_pages, gold_pages, k):
-    """Binary relevance nDCG@k: relevant chunk = 1, else 0."""
     dcg = 0.0
     for i, page in enumerate(retrieved_pages[:k], start=1):
         rel = 1 if page in gold_pages else 0
@@ -201,9 +163,7 @@ def ndcg_at_k(retrieved_pages, gold_pages, k):
     return dcg / idcg if idcg > 0 else 0.0
 
 
-# ------------------------------------------------------------------
-# 4. RUN EVALUATION
-# ------------------------------------------------------------------
+# EVALUATION
 
 def evaluate(gold_records, retriever_name, retriever_fn, k=5, generate_fn=None, gen_top_k=3):
     rows = []
@@ -233,8 +193,6 @@ def evaluate(gold_records, retriever_name, retriever_fn, k=5, generate_fn=None, 
         }
 
         if generate_fn is not None:
-            # generator.py is built around top-3 evidence (its own DEFAULT_TOP_K),
-            # so feed it the same slice it would get in normal use, not all k.
             gen_results = results[:gen_top_k]
             try:
                 row["generated_answer"] = generate_fn(query=question, results=gen_results)
